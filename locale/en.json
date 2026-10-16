@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Codex Reset Tracker",
+    "description": "Shows today's reported reset status, latest reset, and next schedule below the composer, with a read-only codex_reset tool for public status and records."
+  }
+}

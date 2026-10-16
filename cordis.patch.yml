@@ -1,0 +1,6 @@
+# Composer status client and read-only codex_reset tool.
+# Config: apiBaseUrl, cacheTtlSeconds, timeoutMs.
+- insert:
+    - id: codex-reset
+      name: 'dsh-codex-reset'
+      config: {}

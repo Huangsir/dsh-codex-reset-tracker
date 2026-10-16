@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Codex 重置追踪",
+    "description": "在 composer 下方查看今日重置状态、最近重置和下次排期，并通过 codex_reset 工具查询公开状态与记录。"
+  }
+}
