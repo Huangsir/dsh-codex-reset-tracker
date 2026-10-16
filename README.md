@@ -1,10 +1,18 @@
 # dsh-codex-reset-tracker
 
-DeepSeek Harness plugin for Codex reset status. It adds a composer entry with a compact status popover and registers the read-only `codex_reset` agent tool. Reset data comes from [didcodexreset.com](https://didcodexreset.com/zh/) and does not include account-specific quota information.
+DeepSeek Harness plugin for Codex reset status. It adds a composer entry with a compact status popover and registers the read-only `codex_reset` agent tool.
 
-![Light theme](assets/screenshot-light.jpg)
+## Acknowledgements
 
-![Dark theme](assets/screenshot-dark.jpg)
+Reset signals and available translations are provided by [Did Codex Reset](https://didcodexreset.com/zh/). Thank you to its maintainers for collecting and organizing these public reset signals and providing the [read-only API](https://didcodexreset.com/zh/api.html) and [OpenAPI specification](https://didcodexreset.com/openapi/v1/openapi.json). This repository is a DSH integration of that upstream work; the API does not include account-specific quota information.
+
+Original reset announcements are from [Tibo Sottiaux (@thsottiaux)](https://x.com/thsottiaux).
+
+## Screenshots
+
+<p><a href="assets/screenshot-light.jpg"><img src="assets/screenshot-light.jpg" alt="Light theme" width="380"></a></p>
+
+<p><a href="assets/screenshot-dark.jpg"><img src="assets/screenshot-dark.jpg" alt="Dark theme" width="380"></a></p>
 
 ## What it shows
 
@@ -43,6 +51,6 @@ The tool accepts an optional `lang` for record translations. Successful response
 
 Override these values under the plugin row's `config` in `cordis.patch.yml`. The public API documents a shared limit of 60 requests per hour per IP.
 
-## Data and license
+## License
 
-The reset signals are provided by didcodexreset.com. Tibo Sottiaux's source post and profile image are third-party materials; this project attributes them to the source and does not claim ownership. Project code is licensed under the MIT License.
+The MIT License applies to this repository's code only. It does not relicense Did Codex Reset's data or translations, or Tibo Sottiaux's post and profile image.
