@@ -1,3 +1,5 @@
+English | [简体中文](README.zh-CN.md)
+
 # dsh-codex-reset-tracker
 
 DeepSeek Harness plugin for Codex reset status. It adds a composer entry with a compact status popover and registers the read-only `codex_reset` agent tool.
@@ -10,9 +12,9 @@ Original reset announcements are from [Tibo Sottiaux (@thsottiaux)](https://x.co
 
 ## Screenshots
 
-<p><a href="assets/screenshot-light.jpg"><img src="assets/screenshot-light.jpg" alt="Light theme" width="380"></a></p>
-
-<p><a href="assets/screenshot-dark.jpg"><img src="assets/screenshot-dark.jpg" alt="Dark theme" width="380"></a></p>
+| Light theme | Dark theme |
+|---|---|
+| <a href="assets/screenshot-light.jpg"><img src="assets/screenshot-light.jpg" alt="Light theme" width="380"></a> | <a href="assets/screenshot-dark.jpg"><img src="assets/screenshot-dark.jpg" alt="Dark theme" width="380"></a> |
 
 ## What it shows
 
