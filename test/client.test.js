@@ -36,7 +36,7 @@ function client() {
     },
   });
   const instrumented = source.replace('return { name, inject, apply };', `return { name, inject, apply,
-    ResetSummary, resetHappenedToday, latestResetRecord, resetCompletionTime,
+    ResetSummary, resetHappenedToday, reportedVerdict: typeof reportedVerdict === "function" ? reportedVerdict : undefined, latestResetRecord, resetCompletionTime,
     ensureStatus, retainStatusPolling, statusStore, en, zh };`);
   vm.runInContext(instrumented, context);
   return {
@@ -61,13 +61,16 @@ test('installation identity includes tracker in manifest, lockfile, loader and p
   assert.match(readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8'), /name: 'dsh-codex-reset-tracker'/);
 });
 
-test('captured Day 17 pending announcement is unconfirmed, never a completed reset', () => {
+test('captured Day 17 headline reports the source page probability and Yes', () => {
   const { api } = client();
   assert.equal(api.resetHappenedToday(fixture.data, now), false);
   const rendered = textOf(api.ResetSummary({ data: fixture.data, t, localeId: 'zh-CN', now }));
-  assert.match(rendered, /todayUnconfirmed/);
-  assert.match(rendered, /pendingConfirmation/);
-  assert.doesNotMatch(rendered, /todayNo|todayYes/);
+  assert.match(rendered, /upcomingQuestion/);
+  assert.match(rendered, /≥86%/);
+  assert.match(rendered, /todayYes/);
+  assert.doesNotMatch(rendered, /todayUnconfirmed/);
+  assert.equal(api.reportedVerdict(fixture.data, now).percent, 86);
+  assert.equal(api.latestResetRecord(fixture.data).id, fixture.data.latestGlobal.id);
 });
 
 test('confirmed completion today switches to yes; an elapsed schedule never does', () => {
@@ -160,4 +163,42 @@ test('hung fetch times out and can be retried instead of staying in loading fore
   await c.api.ensureStatus('en', true);
   assert.equal(c.api.statusStore.getSnapshot().phase, 'ready');
   assert.equal(c.timeouts.size, 0);
+});
+
+// Source-page headline rules observed at https://didcodexreset.com/zh/:
+// live schedules display rounded confidence + Yes; 100% has no ≥ prefix.
+test('reported probability has no invented threshold and preserves exact 100%', () => {
+  const { api } = client();
+  const data = structuredClone(fixture.data);
+  for (const [confidence, expected] of [[0.8, '≥80%'], [0.65, '≥65%'], [1, '100%']]) {
+    data.nextScheduled.confidence = confidence;
+    const rendered = textOf(api.ResetSummary({ data, t, localeId: 'en', now }));
+    assert.ok(rendered.includes(expected));
+    assert.match(rendered, /todayYes/);
+  }
+});
+
+test('missing confidence is not fabricated and no schedule uses the source daily answer', () => {
+  const { api } = client();
+  const data = structuredClone(fixture.data);
+  data.nextScheduled.confidence = null;
+  let rendered = textOf(api.ResetSummary({ data, t, localeId: 'en', now }));
+  assert.doesNotMatch(rendered, /%/);
+  assert.match(rendered, /upcomingQuestion/);
+  data.nextScheduled = null;
+  rendered = textOf(api.ResetSummary({ data, t, localeId: 'en', now }));
+  assert.match(rendered, /todayQuestion/);
+  assert.match(rendered, /todayNo/);
+  assert.doesNotMatch(rendered, /todayYes|%/);
+});
+
+test('completed today takes priority over a pending forecast without changing record kind', () => {
+  const { api } = client();
+  const data = structuredClone(fixture.data);
+  data.latestGlobal.completedAt = '2026-10-22T09:00:00Z';
+  const rendered = textOf(api.ResetSummary({ data, t, localeId: 'en', now }));
+  assert.match(rendered, /todayQuestion/);
+  assert.match(rendered, /todayYes/);
+  assert.doesNotMatch(rendered, /%|upcomingQuestion/);
+  assert.equal(data.nextScheduled.kind, 'reset_scheduled');
 });

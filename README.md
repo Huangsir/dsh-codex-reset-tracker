@@ -18,8 +18,8 @@ Original reset announcements are from [Tibo Sottiaux (@thsottiaux)](https://x.co
 
 ## What it shows
 
-- The composer entry opens a compact popover with today's reset status, the latest reset time, and the next scheduled time.
-- The day check uses the browser's local calendar day. Without a confirmed completion today, the answer is **Unconfirmed**, with a separate notice when a reset has been announced. Scheduled events do not count as completed resets. If `completedAt` and `effectiveAt` are unavailable or invalid, the summary uses `announcedAt`.
+- The composer entry reports the source site's live schedule probability (for example, **≥86% Yes**), alongside the latest completed reset and next expected time. The heading switches to an upcoming-reset question when a live schedule is available.
+- Schedule confidence comes directly from the public API; it is rounded to a percent as on the source page, with no plugin-defined 80% threshold. A live schedule displays probability + Yes even when its local date is tomorrow. A completion reported today takes priority. Scheduled events remain schedule records and do not replace the latest completed reset. The day check uses the browser's local calendar day; completion times prefer `completedAt`, then `effectiveAt`, then `announcedAt`.
 - The popover includes the Tibo Sottiaux source post. It shows the Simplified Chinese translation and the English source when both differ.
 - New schedule announcements and completed reset events show an unread marker. The marker clears when the popover is open in a visible tab.
 - The client requests `/status` on mount and refreshes every 10 minutes. Opening the popover, returning to the foreground, or reconnecting checks for updates when the snapshot is at least 60 seconds old. Requests time out after 20 seconds and respect rate-limit cooldowns. The popover displays the local time zone and fetch time; fetch time is not the upstream monitor time. The agent tool can query status or paginated records.

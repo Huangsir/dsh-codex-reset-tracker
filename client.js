@@ -38,18 +38,18 @@ window.__ModuleLoader__.load({
       'typeUnknown': '范围未知',
       'precisionDate': '按日期排期',
       'noTime': '时间未知',
-      'latestReset': '最近重置',
+      'latestReset': '最近完成重置',
       'noResetSummary': '暂无重置记录',
       'todayQuestion': '今天重置了吗？',
       'todayYes': '是',
-      'todayUnconfirmed': '待确认',
-      'pendingConfirmation': '已有排期公告，尚未确认完成。',
-      'noCompletionToday': '公开数据源尚未确认今天完成重置。',
+      'todayNo': '否',
+      'upcomingQuestion': '接下来会有 Codex 重置吗？',
+      'scheduledReport': '原站报道 · 已排期',
       'localTimeZone': '本地时区：{zone}',
       'fetchedAt': '获取于 {time}',
       'todayUnknown': '无法确认',
       'completionAnnouncementTime': '按完成公告时间：{time}',
-      'nextScheduleLabel': '下次排期',
+      'nextScheduleLabel': '预计下次重置',
       'viewOriginal': '查看原帖',
       'dataSource': '数据来源',
       'refreshFetched': '刷新；上次获取于 {time}',
@@ -81,18 +81,18 @@ window.__ModuleLoader__.load({
       'typeUnknown': 'Unknown scope',
       'precisionDate': 'date-level schedule',
       'noTime': 'time unknown',
-      'latestReset': 'Latest reset',
+      'latestReset': 'Latest completed reset',
       'noResetSummary': 'No reset record',
       'todayQuestion': 'Reset today?',
       'todayYes': 'Yes',
-      'todayUnconfirmed': 'Unconfirmed',
-      'pendingConfirmation': 'Reset announced; completion not yet confirmed.',
-      'noCompletionToday': 'The public source has not confirmed a completed reset today.',
+      'todayNo': 'No',
+      'upcomingQuestion': 'Will there be a Codex reset?',
+      'scheduledReport': 'Source report · Scheduled',
       'localTimeZone': 'Local time zone: {zone}',
       'fetchedAt': 'Fetched {time}',
       'todayUnknown': 'Unable to confirm',
       'completionAnnouncementTime': 'Using completion announcement time: {time}',
-      'nextScheduleLabel': 'Next schedule',
+      'nextScheduleLabel': 'Next expected reset',
       'viewOriginal': 'View original post',
       'dataSource': 'Source',
       'refreshFetched': 'Refresh; last fetched {time}',
@@ -285,6 +285,41 @@ window.__ModuleLoader__.load({
         if (eventDay === today) return true;
       }
       return unresolved ? null : false;
+    }
+
+    // Report the public page's live-schedule headline: confidence + Yes.
+    // This presentation never changes the schedule into a completion record.
+    function reportedVerdict(data, now) {
+      const completedToday = resetHappenedToday(data, now);
+      const daily = {
+        questionKey: 'todayQuestion',
+        answerKey: completedToday === null ? 'todayUnknown' : completedToday ? 'todayYes' : 'todayNo',
+        percent: null,
+        scheduled: false,
+      };
+      if (completedToday === true) return daily;
+      const next = data && data.nextScheduled;
+      if (!next || next.kind !== 'reset_scheduled' ||
+          (next.scheduleState && next.scheduleState !== 'pending')) return daily;
+      const window = next.scheduleWindow;
+      const target = (window && (window.endAt || window.startAt)) || next.effectiveAt;
+      const targetAt = Date.parse(target || '');
+      const currentAt = Number.isFinite(now) ? now : Date.parse(data.currentTime || '');
+      if (!Number.isFinite(targetAt) || !Number.isFinite(currentAt) || targetAt < currentAt) return daily;
+      const confidence = next.confidence;
+      const percent = typeof confidence === 'number' && Number.isFinite(confidence) &&
+        confidence >= 0 && confidence <= 1 ? Math.round(confidence * 100) : null;
+      const zone = resolveSummaryTimeZone(data.timeZone);
+      const startsAt = (window && window.startAt) || next.effectiveAt;
+      const coversToday = dateKeyAt(startsAt, zone) === dateKeyAt(currentAt, zone) ||
+        dateKeyAt(targetAt, zone) === dateKeyAt(currentAt, zone);
+      return {
+        questionKey: 'upcomingQuestion',
+        answerKey: percent !== null || (coversToday && next.scheduleBasis !== 'contextual_inference')
+          ? 'todayYes' : 'todayNo',
+        percent,
+        scheduled: true,
+      };
     }
 
     function latestResetRecord(data) {
@@ -711,6 +746,7 @@ window.__ModuleLoader__.load({
 .dcr-summary-today{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;min-width:0}
 .dcr-summary-question{color:var(--dsw-alias-label-secondary);font-size:13px;font-weight:500;line-height:1.4;overflow-wrap:anywhere}
 .dcr-summary-answer{color:var(--dsw-alias-state-business-primary);font-size:32px;font-weight:650;line-height:1;letter-spacing:-.025em}
+.dcr-summary-answer.has-probability{font-size:24px;line-height:1.25;overflow-wrap:anywhere}
 .dcr-summary-answer.is-unknown{font-size:20px;line-height:1.25;letter-spacing:0}
 .dcr-summary-details{display:flex;flex-direction:column;justify-content:center;gap:10px;min-width:0;padding-left:16px;border-left:1px solid var(--dsw-alias-border-l1)}
 .dcr-summary-item{display:flex;flex-direction:column;gap:4px;min-width:0}
@@ -796,7 +832,8 @@ window.__ModuleLoader__.load({
       const latestAt = latestTime && Number.isFinite(Date.parse(latestTime.value))
         ? latestTime.value
         : null;
-      const todayState = resetHappenedToday(data, now);
+      const verdict = reportedVerdict(data, now);
+      const question = t(verdict.questionKey);
       const next = data && data.nextScheduled ? data.nextScheduled : null;
       const scheduleWindow = next && next.scheduleWindow;
       const nextTarget = scheduleWindow && (scheduleWindow.startAt || scheduleWindow.endAt)
@@ -805,12 +842,9 @@ window.__ModuleLoader__.load({
       const nextAt = nextTarget && Number.isFinite(Date.parse(nextTarget))
         ? nextTarget
         : null;
-      const todayAnswer = todayState === null
-        ? t('todayUnknown')
-        : t(todayState ? 'todayYes' : 'todayUnconfirmed');
-      const confirmationHint = todayState === false
-        ? t(next ? 'pendingConfirmation' : 'noCompletionToday')
-        : null;
+      const probability = verdict.percent === null ? ''
+        : (verdict.percent === 100 ? '' : '≥') + verdict.percent + '%';
+      const todayAnswer = [probability, t(verdict.answerKey)].filter(Boolean).join(' ');
       const latestDisplay = latestAt ? fmtAbsCompact(latestAt, localeId) : latest ? t('noTime') : t('noResetSummary');
       const latestRelative = latestAt ? fmtRel(latestAt, t, now) : '';
       const latestTimeTitle = latestAt
@@ -834,12 +868,12 @@ window.__ModuleLoader__.load({
         'section',
         {
           className: 'dcr-status-line',
-          'aria-label': [t('todayQuestion'), todayAnswer, t('latestReset'), latestDisplay, t('nextScheduleLabel'), nextDisplay].join(' · '),
+          'aria-label': [question, todayAnswer, t('latestReset'), latestDisplay, t('nextScheduleLabel'), nextDisplay].join(' · '),
         },
         h('div', { className: 'dcr-summary-today' },
-          h('span', { className: 'dcr-summary-question' }, t('todayQuestion')),
-          h('strong', { className: 'dcr-summary-answer' + (todayState !== true ? ' is-unknown' : '') }, todayAnswer),
-          confirmationHint ? h('span', { className: 'dcr-summary-meta' }, confirmationHint) : null,
+          h('span', { className: 'dcr-summary-question' }, question),
+          h('strong', { className: 'dcr-summary-answer' + (verdict.answerKey === 'todayUnknown' ? ' is-unknown' : probability ? ' has-probability' : '') }, todayAnswer),
+          verdict.scheduled ? h('span', { className: 'dcr-summary-meta' }, t('scheduledReport')) : null,
         ),
         h('div', { className: 'dcr-summary-details' },
           h('div', { className: 'dcr-summary-item' },
