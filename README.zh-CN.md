@@ -42,7 +42,7 @@ dsh plugin --profile <profile> add .
 
 ```sh
 dsh plugin --profile <profile> remove dsh-codex-reset
-dsh plugin --profile <profile> add https://github.com/loshanvren/dsh-codex-reset-tracker/releases/download/v0.4.0/dsh-codex-reset-tracker.tgz
+dsh plugin --profile <profile> add https://github.com/loshanvren/dsh-codex-reset-tracker/releases/latest/download/dsh-codex-reset-tracker.tgz
 ```
 
 替换后重启 DSH。如果曾手工应用安装补丁，请将包 `name` 改为 `dsh-codex-reset-tracker`，保留 `codex-reset` 行 ID 及原有 `config`，不要保留第二条旧插件记录。未读标记使用的存储键保持兼容。

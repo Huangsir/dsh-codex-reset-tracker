@@ -42,7 +42,7 @@ The old package was named `dsh-codex-reset`. Remove that package from the same D
 
 ```sh
 dsh plugin --profile <profile> remove dsh-codex-reset
-dsh plugin --profile <profile> add https://github.com/loshanvren/dsh-codex-reset-tracker/releases/download/v0.4.0/dsh-codex-reset-tracker.tgz
+dsh plugin --profile <profile> add https://github.com/loshanvren/dsh-codex-reset-tracker/releases/latest/download/dsh-codex-reset-tracker.tgz
 ```
 
 Restart DSH after replacing the package. If you applied the patch manually, change its package `name` to `dsh-codex-reset-tracker`, preserve the `codex-reset` row ID and your `config`, and do not keep a second old row. The unread storage key stays compatible.

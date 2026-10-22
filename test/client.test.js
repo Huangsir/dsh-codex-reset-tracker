@@ -202,3 +202,15 @@ test('completed today takes priority over a pending forecast without changing re
   assert.doesNotMatch(rendered, /%|upcomingQuestion/);
   assert.equal(data.nextScheduled.kind, 'reset_scheduled');
 });
+
+test('a multi-day explicit schedule covering now reports Yes without inventing confidence', () => {
+  const { api } = client();
+  const data = structuredClone(fixture.data);
+  data.nextScheduled.confidence = null;
+  data.nextScheduled.scheduleWindow = {
+    startAt: '2026-10-20T18:00:00Z', endAt: '2026-10-23T18:00:00Z',
+  };
+  const rendered = textOf(api.ResetSummary({ data, t, localeId: 'en', now }));
+  assert.match(rendered, /todayYes/);
+  assert.doesNotMatch(rendered, /%/);
+});

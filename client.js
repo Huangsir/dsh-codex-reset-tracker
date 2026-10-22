@@ -311,7 +311,9 @@ window.__ModuleLoader__.load({
         confidence >= 0 && confidence <= 1 ? Math.round(confidence * 100) : null;
       const zone = resolveSummaryTimeZone(data.timeZone);
       const startsAt = (window && window.startAt) || next.effectiveAt;
-      const coversToday = dateKeyAt(startsAt, zone) === dateKeyAt(currentAt, zone) ||
+      const startAt = Date.parse(startsAt || '');
+      const coversToday = (Number.isFinite(startAt) && startAt <= currentAt && currentAt < targetAt) ||
+        dateKeyAt(startsAt, zone) === dateKeyAt(currentAt, zone) ||
         dateKeyAt(targetAt, zone) === dateKeyAt(currentAt, zone);
       return {
         questionKey: 'upcomingQuestion',
