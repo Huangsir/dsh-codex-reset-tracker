@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: 'dsh-codex-reset',
+  id: 'dsh-codex-reset-tracker',
   factory(require) {
     const React = require('react');
     const { useState, useEffect, useMemo, useCallback, useLayoutEffect, useRef } = React;
@@ -12,6 +12,8 @@ window.__ModuleLoader__.load({
     const TIBO_TRANSLATION_LANG = 'zh-CN';
     const TIBO_AVATAR_DATA_URI = 'data:image/webp;base64,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';
     const AUTO_REFRESH_MS = 10 * 60 * 1000;
+    const INTERACTIVE_REFRESH_MS = 60 * 1000;
+    const REQUEST_TIMEOUT_MS = 20 * 1000;
     const zh = {
       'title': 'Codex 重置追踪',
       'chipName': 'Codex 重置追踪',
@@ -40,7 +42,11 @@ window.__ModuleLoader__.load({
       'noResetSummary': '暂无重置记录',
       'todayQuestion': '今天重置了吗？',
       'todayYes': '是',
-      'todayNo': '否',
+      'todayUnconfirmed': '待确认',
+      'pendingConfirmation': '已有排期公告，尚未确认完成。',
+      'noCompletionToday': '公开数据源尚未确认今天完成重置。',
+      'localTimeZone': '本地时区：{zone}',
+      'fetchedAt': '获取于 {time}',
       'todayUnknown': '无法确认',
       'completionAnnouncementTime': '按完成公告时间：{time}',
       'nextScheduleLabel': '下次排期',
@@ -79,7 +85,11 @@ window.__ModuleLoader__.load({
       'noResetSummary': 'No reset record',
       'todayQuestion': 'Reset today?',
       'todayYes': 'Yes',
-      'todayNo': 'No',
+      'todayUnconfirmed': 'Unconfirmed',
+      'pendingConfirmation': 'Reset announced; completion not yet confirmed.',
+      'noCompletionToday': 'The public source has not confirmed a completed reset today.',
+      'localTimeZone': 'Local time zone: {zone}',
+      'fetchedAt': 'Fetched {time}',
       'todayUnknown': 'Unable to confirm',
       'completionAnnouncementTime': 'Using completion announcement time: {time}',
       'nextScheduleLabel': 'Next schedule',
@@ -311,10 +321,12 @@ window.__ModuleLoader__.load({
       const url = new URL(API_BASE + '/status');
       // Request the Chinese translation for the bilingual source post.
       url.searchParams.set('lang', TIBO_TRANSLATION_LANG);
+      const timeZone = resolveSummaryTimeZone();
+      if (timeZone) url.searchParams.set('timeZone', timeZone);
       let res;
       let body;
       try {
-        res = await fetch(url.toString(), { signal, headers: { accept: 'application/json' } });
+        res = await fetch(url.toString(), { signal, cache: 'no-store', headers: { accept: 'application/json' } });
         body = await res.json();
       } catch (err) {
         if (err && err.name === 'AbortError') throw err;
@@ -518,7 +530,7 @@ window.__ModuleLoader__.load({
         !force &&
         entry &&
         entry.lang === lang &&
-        Date.now() - entry.at < AUTO_REFRESH_MS
+        Date.now() - entry.at < INTERACTIVE_REFRESH_MS
       ) {
         if (snapshot.phase !== 'error' && snapshot.phase !== 'refreshing') {
           statusStore.set({ ...snapshot, phase: 'ready', lang, error: null });
@@ -536,6 +548,11 @@ window.__ModuleLoader__.load({
         retryAt,
       });
       const controller = new AbortController();
+      let timedOut = false;
+      const timeout = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, REQUEST_TIMEOUT_MS);
       const promise = (async () => {
         try {
           const fresh = await fetchStatus(lang, controller.signal);
@@ -545,7 +562,8 @@ window.__ModuleLoader__.load({
             statusStore.set({ phase: 'ready', entry: { ...fresh, lang }, error: null, lang, retryAt: 0 });
           }
         } catch (err) {
-          if (err && err.name === 'AbortError') return;
+          if (err && err.name === 'AbortError' && !timedOut) return;
+          if (timedOut) err = new Error(isZh(lang) ? '请求超时，请重试。' : 'Request timed out. Please retry.');
           if (requestedLang === lang) {
             if (err && err.status === 429 && typeof err.retryAfter === 'number') {
               retryAt = Date.now() + err.retryAfter * 1000;
@@ -559,6 +577,7 @@ window.__ModuleLoader__.load({
             });
           }
         } finally {
+          clearTimeout(timeout);
           const current = statusInflight.get(lang);
           if (current && current.promise === promise) statusInflight.delete(lang);
         }
@@ -567,11 +586,20 @@ window.__ModuleLoader__.load({
       return promise;
     }
 
+    function refreshVisibleStatus() {
+      if (statusPollUsers > 0 && statusPollLang && document.visibilityState === 'visible') {
+        ensureStatus(statusPollLang, false);
+      }
+    }
+
     function retainStatusPolling(lang) {
       statusPollUsers += 1;
       statusPollLang = lang;
       ensureStatus(lang, false);
       if (!statusPollTimer) {
+        document.addEventListener('visibilitychange', refreshVisibleStatus);
+        window.addEventListener('focus', refreshVisibleStatus);
+        window.addEventListener('online', refreshVisibleStatus);
         statusPollTimer = setInterval(() => {
           if (statusPollUsers > 0 && statusPollLang) ensureStatus(statusPollLang, true);
         }, AUTO_REFRESH_MS);
@@ -580,6 +608,9 @@ window.__ModuleLoader__.load({
         statusPollUsers = Math.max(0, statusPollUsers - 1);
         if (statusPollUsers === 0 && statusPollTimer) {
           clearInterval(statusPollTimer);
+          document.removeEventListener('visibilitychange', refreshVisibleStatus);
+          window.removeEventListener('focus', refreshVisibleStatus);
+          window.removeEventListener('online', refreshVisibleStatus);
           statusPollTimer = null;
           statusPollLang = null;
         }
@@ -686,6 +717,7 @@ window.__ModuleLoader__.load({
 .dcr-summary-label{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:500;line-height:1.35}
 .dcr-summary-value{color:var(--dsw-alias-label-primary);font-size:15px;font-weight:600;line-height:1.35;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .dcr-summary-subvalue{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:400;line-height:1.35;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.dcr-freshness{margin:10px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .dcr-summary-meta{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:400;line-height:1.35}
 .dcr-tibo-post{box-sizing:border-box;width:100%;min-width:0;margin-top:16px}
 .dcr-tibo-head{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:start;gap:12px;min-width:0}
@@ -775,7 +807,10 @@ window.__ModuleLoader__.load({
         : null;
       const todayAnswer = todayState === null
         ? t('todayUnknown')
-        : t(todayState ? 'todayYes' : 'todayNo');
+        : t(todayState ? 'todayYes' : 'todayUnconfirmed');
+      const confirmationHint = todayState === false
+        ? t(next ? 'pendingConfirmation' : 'noCompletionToday')
+        : null;
       const latestDisplay = latestAt ? fmtAbsCompact(latestAt, localeId) : latest ? t('noTime') : t('noResetSummary');
       const latestRelative = latestAt ? fmtRel(latestAt, t, now) : '';
       const latestTimeTitle = latestAt
@@ -803,7 +838,8 @@ window.__ModuleLoader__.load({
         },
         h('div', { className: 'dcr-summary-today' },
           h('span', { className: 'dcr-summary-question' }, t('todayQuestion')),
-          h('strong', { className: 'dcr-summary-answer' + (todayState === null ? ' is-unknown' : '') }, todayAnswer),
+          h('strong', { className: 'dcr-summary-answer' + (todayState !== true ? ' is-unknown' : '') }, todayAnswer),
+          confirmationHint ? h('span', { className: 'dcr-summary-meta' }, confirmationHint) : null,
         ),
         h('div', { className: 'dcr-summary-details' },
           h('div', { className: 'dcr-summary-item' },
@@ -1055,6 +1091,10 @@ window.__ModuleLoader__.load({
       useEffect(() => retainStatusPolling(lang), [lang]);
 
       useEffect(() => {
+        if (open) ensureStatus(lang, false);
+      }, [open, lang]);
+
+      useEffect(() => {
         const syncVisibility = () => {
           const visible = document.visibilityState === 'visible';
           setIsVisible(visible);
@@ -1235,6 +1275,12 @@ window.__ModuleLoader__.load({
                   ? h(ErrorBox, { status, t, onRetry: () => ensureStatus(lang, true), now })
                 : null,
                 h(ResetSummary, { data, t, localeId, now }),
+                h('p', { className: 'dcr-freshness' },
+                  [
+                    t('localTimeZone', { zone: resolveSummaryTimeZone(data && data.timeZone) || Intl.DateTimeFormat().resolvedOptions().timeZone || '-' }),
+                    fetchedAt ? t('fetchedAt', { time: fmtAbsExact(new Date(fetchedAt).toISOString(), localeId) }) : '',
+                  ].filter(Boolean).join(' · '),
+                ),
                 h(TiboPost, {
                   data,
                   summaryTimeIso,

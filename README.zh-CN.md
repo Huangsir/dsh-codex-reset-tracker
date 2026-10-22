@@ -19,10 +19,10 @@ DeepSeek Harness 的 Codex 重置状态插件。它在 composer 输入区添加�
 ## 显示内容
 
 - composer 输入区的入口会打开简洁的状态浮层，显示今天的重置状态、最近一次重置时间和下次排期时间。
-- “今天”的判断使用浏览器本地日历日期。已排期事件不计为已完成重置。如果 `completedAt` 和 `effectiveAt` 缺失或无效，摘要会使用 `announcedAt`。
+- “今天”的判断使用浏览器本地日历日期。公开数据源没有确认今天完成重置时，显示 **待确认**；有排期公告时另行提示，不把公告当作完成。已排期事件不计为已完成重置。如果 `completedAt` 和 `effectiveAt` 缺失或无效，摘要会使用 `announcedAt`。
 - 浮层包含 Tibo Sottiaux 的来源帖子。当简体中文译文与英文原文不同时，会同时显示两者。
 - 新的排期公告和已完成的重置事件会显示未读标记。浮层在可见标签页中打开时，标记会清除。
-- 客户端加载时请求 `/status`，之后每 10 分钟刷新一次。智能体工具可查询状态或分页记录。
+- 客户端加载时请求 `/status`，之后每 10 分钟刷新一次。打开浮层、恢复前台或恢复网络时，若快照已超过 60 秒则检查更新。请求在 20 秒后超时，并遵守限流冷却时间。浮层展示本地时区与获取时间；获取时间不代表上游监测时间。智能体工具可查询状态或分页记录。
 
 ## 从源码安装
 
@@ -34,7 +34,26 @@ cd dsh-codex-reset-tracker
 dsh plugin --profile <profile> add .
 ```
 
-在 DSH 加载器和 `package.json` 清单中，包名均为 `dsh-codex-reset`。
+自 v0.4.0 起，安装包和客户端加载器名称均为 `dsh-codex-reset-tracker`。
+
+### 从 v0.3.x 升级
+
+旧包名为 `dsh-codex-reset`。请先从同一个 DSH 配置档案移除旧包，再安装新包，避免旧工具和 composer 入口同时启用：
+
+```sh
+dsh plugin --profile <profile> remove dsh-codex-reset
+dsh plugin --profile <profile> add https://github.com/loshanvren/dsh-codex-reset-tracker/releases/download/v0.4.0/dsh-codex-reset-tracker.tgz
+```
+
+替换后重启 DSH。如果曾手工应用安装补丁，请将包 `name` 改为 `dsh-codex-reset-tracker`，保留 `codex-reset` 行 ID 及原有 `config`，不要保留第二条旧插件记录。未读标记使用的存储键保持兼容。
+
+### 预构建安装
+
+```sh
+dsh plugin --profile <profile> add https://github.com/loshanvren/dsh-codex-reset-tracker/releases/latest/download/dsh-codex-reset-tracker.tgz
+```
+
+发布包包含与源码安装相同的 JavaScript、清单、补丁及语言文件，无需安装期构建。
 
 ## 智能体工具
 
