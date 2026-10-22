@@ -2,5 +2,5 @@
 # Config: apiBaseUrl, cacheTtlSeconds, timeoutMs.
 - insert:
     - id: codex-reset
-      name: 'dsh-codex-reset'
+      name: 'dsh-codex-reset-tracker'
       config: {}

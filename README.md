@@ -19,10 +19,10 @@ Original reset announcements are from [Tibo Sottiaux (@thsottiaux)](https://x.co
 ## What it shows
 
 - The composer entry opens a compact popover with today's reset status, the latest reset time, and the next scheduled time.
-- The day check uses the browser's local calendar day. Scheduled events do not count as completed resets. If `completedAt` and `effectiveAt` are unavailable or invalid, the summary uses `announcedAt`.
+- The day check uses the browser's local calendar day. Without a confirmed completion today, the answer is **Unconfirmed**, with a separate notice when a reset has been announced. Scheduled events do not count as completed resets. If `completedAt` and `effectiveAt` are unavailable or invalid, the summary uses `announcedAt`.
 - The popover includes the Tibo Sottiaux source post. It shows the Simplified Chinese translation and the English source when both differ.
 - New schedule announcements and completed reset events show an unread marker. The marker clears when the popover is open in a visible tab.
-- The client requests `/status` on mount and refreshes every 10 minutes. The agent tool can query status or paginated records.
+- The client requests `/status` on mount and refreshes every 10 minutes. Opening the popover, returning to the foreground, or reconnecting checks for updates when the snapshot is at least 60 seconds old. Requests time out after 20 seconds and respect rate-limit cooldowns. The popover displays the local time zone and fetch time; fetch time is not the upstream monitor time. The agent tool can query status or paginated records.
 
 ## Install from source
 
@@ -34,7 +34,26 @@ cd dsh-codex-reset-tracker
 dsh plugin --profile <profile> add .
 ```
 
-The package is named `dsh-codex-reset` in the DSH loader and package manifest.
+The package and client loader are named `dsh-codex-reset-tracker` as of v0.4.0.
+
+### Upgrade from v0.3.x
+
+The old package was named `dsh-codex-reset`. Remove that package from the same DSH profile before installing the new package, so the old tool and composer entry do not remain enabled alongside the new ones:
+
+```sh
+dsh plugin --profile <profile> remove dsh-codex-reset
+dsh plugin --profile <profile> add https://github.com/loshanvren/dsh-codex-reset-tracker/releases/download/v0.4.0/dsh-codex-reset-tracker.tgz
+```
+
+Restart DSH after replacing the package. If you applied the patch manually, change its package `name` to `dsh-codex-reset-tracker`, preserve the `codex-reset` row ID and your `config`, and do not keep a second old row. The unread storage key stays compatible.
+
+### Prebuilt install
+
+```sh
+dsh plugin --profile <profile> add https://github.com/loshanvren/dsh-codex-reset-tracker/releases/latest/download/dsh-codex-reset-tracker.tgz
+```
+
+The release tarball contains the same JavaScript, manifest, patch and locale files as a source install; there is no install-time build script.
 
 ## Agent tool
 
