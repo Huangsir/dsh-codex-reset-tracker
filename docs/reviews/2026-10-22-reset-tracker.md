@@ -1,5 +1,7 @@
 # v0.4.0 review and acceptance
 
+> Historical v0.4.0 record. The live-schedule headline interpretation is superseded by [v0.4.1](2026-10-22-source-report.md).
+
 Baseline: `44f098ac1611f654abd2f1190f4c21d99cd1f02f`.
 Implementation reviewed: `24206222aee33955cc1f8883817c154af9630ab7`.
 Scope: issues #1 and #2, full plugin sanity check and marketplace distribution.
