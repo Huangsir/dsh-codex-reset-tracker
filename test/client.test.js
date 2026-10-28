@@ -71,10 +71,11 @@ function client(shared = {}) {
     },
   };
   if (!shared.withoutNotificationApi) globals.Notification = NotificationStub;
+  if (shared.locks) globals.navigator = { locks: shared.locks };
   const context = vm.createContext(globals);
   const instrumented = source.replace('return { name, inject, apply };', `return { name, inject, apply,
     ResetSummary, resetHappenedToday, reportedVerdict: typeof reportedVerdict === "function" ? reportedVerdict : undefined, latestResetRecord, resetCompletionTime,
-    NoticePermissionControl, todayCompletionKey,
+    NoticePermissionControl, todayCompletionKeys,
     ensureStatus, retainStatusPolling, statusStore, CodexResetDock, en, zh };`);
   vm.runInContext(instrumented, context);
   return {
@@ -511,4 +512,60 @@ test('a multi-day explicit schedule covering now reports Yes without inventing c
   const rendered = textOf(api.ResetSummary({ data, t, localeId: 'en', now }));
   assert.match(rendered, /todayYes/);
   assert.doesNotMatch(rendered, /%/);
+});
+
+
+test('two already-open pages share completion dedup state', async () => {
+  const shared = { storage: new Map(), notifications: [] };
+  const first = client(shared);
+  const second = client(shared);
+  await first.api.ensureStatus('en', true);
+  await second.api.ensureStatus('en', true);
+  first.respond(completedToday());
+  second.respond(completedToday());
+  await first.api.ensureStatus('en', true);
+  await second.api.ensureStatus('en', true);
+  assert.equal(shared.notifications.length, 1);
+});
+
+test('the same completion in both API slots is announced once', async () => {
+  const c = client();
+  await c.api.ensureStatus('en', true);
+  const value = completedToday();
+  value.data.latestGlobal.resetType = 'global_and_banked';
+  c.respond(value);
+  await c.api.ensureStatus('en', true);
+  value.data.latestBanked = structuredClone(value.data.latestGlobal);
+  await c.api.ensureStatus('en', true);
+  assert.equal(c.notifications.length, 1);
+});
+
+test('concurrent pages serialize announcement decisions with Web Locks', async () => {
+  let tail = Promise.resolve();
+  const shared = { storage: new Map(), notifications: [], locks: {
+    request(_key, fn) { const pending = tail.then(fn); tail = pending.catch(() => {}); return pending; },
+  } };
+  const first = client(shared);
+  const second = client(shared);
+  await Promise.all([first.api.ensureStatus('en', true), second.api.ensureStatus('en', true)]);
+  first.respond(completedToday());
+  second.respond(completedToday());
+  await Promise.all([first.api.ensureStatus('en', true), second.api.ensureStatus('en', true)]);
+  assert.equal(shared.notifications.length, 1);
+});
+
+test('a previously announced completion remains deduped after a newer snapshot', async () => {
+  const c = client();
+  await c.api.ensureStatus('en', true);
+  const a = completedToday();
+  c.respond(a);
+  await c.api.ensureStatus('en', true);
+  const b = structuredClone(a);
+  b.data.latestGlobal.id = 'later-completion';
+  b.data.latestGlobal.completedAt = '2026-10-22T10:00:00Z';
+  c.respond(b);
+  await c.api.ensureStatus('en', true);
+  c.respond(a);
+  await c.api.ensureStatus('en', true);
+  assert.equal(c.notifications.length, 2);
 });

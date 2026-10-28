@@ -15,6 +15,7 @@ window.__ModuleLoader__.load({
     const INTERACTIVE_REFRESH_MS = 60 * 1000;
     const REQUEST_TIMEOUT_MS = 20 * 1000;
     const RESET_NOTICE_STORAGE_KEY = 'dsh-codex-reset-tracker.reset-notice.v1';
+    const MAX_RESET_NOTICE_KEYS = 128;
     const zh = {
       'title': 'Codex 重置追踪',
       'chipName': 'Codex 重置追踪',
@@ -438,49 +439,48 @@ window.__ModuleLoader__.load({
     let statusPollTimer = null;
     let requestedLang = null;
     let retryAt = 0;
-    /** Last announced completion key, plus whether the stored one was read yet. */
-    let resetNoticeKey = null;
+    /** Recent completion identities observed by this page and shared storage. */
+    let resetNoticeKeys = [];
     let resetNoticeReady = false;
 
-    /**
-     * Key of the completions today's answer reports, or null while the daily
-     * answer is not an explicit yes. The notification fires only when this key
-     * changes, so forecasts and repeated polls stay silent.
-     */
-    function todayCompletionKey(data, now) {
-      if (resetHappenedToday(data, now) !== true) return null;
+    /** Unique event identities, independent of which status slot contains them. */
+    function todayCompletionKeys(data, now) {
+      if (resetHappenedToday(data, now) !== true) return [];
       const timeZone = resolveSummaryTimeZone(data.timeZone);
       const currentAt = Number.isFinite(now) ? now : Date.parse(data.currentTime || '');
       const today = dateKeyAt(currentAt, timeZone);
-      const keys = [data.latestGlobal, data.latestBanked]
-        .filter(Boolean)
+      return Array.from(new Set([data.latestGlobal, data.latestBanked]
+        .filter((record) => record && (!record.kind || record.kind === 'reset_completed'))
         .map((record) => {
           const time = resetCompletionTime(record);
-          const day = time && dateKeyAt(time.value, timeZone);
-          return day && day === today ? (record.id || time.value) + '@' + day : null;
+          const at = time && Date.parse(time.value);
+          if (!Number.isFinite(at) || at > currentAt || dateKeyAt(at, timeZone) !== today) return null;
+          return record.id ? 'id:' + record.id : 'time:' + record.resetType + ':' + time.value;
         })
-        .filter(Boolean);
-      return keys.length ? keys.join('|') : null;
+        .filter(Boolean)));
     }
 
-    /** Stored announcement key; undefined means this browser recorded none yet. */
-    function readStoredResetNotice() {
+    function normalizeResetNoticeKeys(keys) {
+      return Array.from(new Set(keys.filter((key) =>
+        typeof key === 'string' && key.length > 0 && key.length <= 1024,
+      ))).slice(-MAX_RESET_NOTICE_KEYS);
+    }
+
+    /** undefined means this browser has not recorded its first baseline. */
+    function readStoredResetNotices() {
       try {
-        const raw = window.localStorage.getItem(RESET_NOTICE_STORAGE_KEY);
-        if (!raw) return undefined;
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed !== 'object' || !('key' in parsed)) return undefined;
-        return typeof parsed.key === 'string' ? parsed.key : null;
+        const parsed = JSON.parse(window.localStorage.getItem(RESET_NOTICE_STORAGE_KEY));
+        return parsed && Array.isArray(parsed.keys) ? normalizeResetNoticeKeys(parsed.keys) : undefined;
       } catch {
         return undefined;
       }
     }
 
-    function writeStoredResetNotice(key) {
+    function writeStoredResetNotices(keys) {
       try {
-        window.localStorage.setItem(RESET_NOTICE_STORAGE_KEY, JSON.stringify({ key }));
+        window.localStorage.setItem(RESET_NOTICE_STORAGE_KEY, JSON.stringify({ keys }));
       } catch {
-        // Blocked storage still dedupes within this page through the in-memory key.
+        // Blocked storage still dedupes within this page through in-memory keys.
       }
     }
 
@@ -514,24 +514,29 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** Announce each completion the dock has not reported before, exactly once. */
-    function observeResetCompletion(data) {
-      const next = todayCompletionKey(data, Date.now());
-      if (!resetNoticeReady) {
+    /** Refresh shared seen IDs for every decision; serialize concurrent pages when supported. */
+    async function observeResetCompletion(data) {
+      const current = todayCompletionKeys(data, Date.now());
+      const update = () => {
+        const stored = readStoredResetNotices();
+        const seen = new Set([...resetNoticeKeys, ...(stored || [])]);
+        const baseline = !resetNoticeReady && stored === undefined;
+        const fresh = current.some((key) => !seen.has(key));
         resetNoticeReady = true;
-        const stored = readStoredResetNotice();
-        if (stored === undefined) {
-          // First run: remember today's answer without claiming a reset happened.
-          resetNoticeKey = next;
-          writeStoredResetNotice(next);
+        resetNoticeKeys = normalizeResetNoticeKeys([...seen, ...current]);
+        writeStoredResetNotices(resetNoticeKeys);
+        if (!baseline && fresh) showSystemResetNotice();
+      };
+      const locks = typeof navigator !== 'undefined' && navigator.locks;
+      if (locks && typeof locks.request === 'function') {
+        try {
+          await locks.request(RESET_NOTICE_STORAGE_KEY, update);
           return;
+        } catch {
+          // Fall back to shared-storage checks if browser coordination is unavailable.
         }
-        resetNoticeKey = stored;
       }
-      if (next === null || next === resetNoticeKey) return;
-      resetNoticeKey = next;
-      writeStoredResetNotice(next);
-      showSystemResetNotice();
+      update();
     }
 
     function requestNotificationPermission(onPermission) {
@@ -605,7 +610,7 @@ window.__ModuleLoader__.load({
           if (requestedLang === lang) {
             retryAt = 0;
             statusStore.set({ phase: 'ready', entry: { ...fresh, lang }, error: null, lang, retryAt: 0 });
-            observeResetCompletion(fresh.data);
+            await observeResetCompletion(fresh.data);
           }
         } catch (err) {
           if (err && err.name === 'AbortError' && !timedOut) return;
