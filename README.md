@@ -19,10 +19,11 @@ Original reset announcements are from [Tibo Sottiaux (@thsottiaux)](https://x.co
 ## What it shows
 
 - The composer entry reports the source site's live schedule probability (for example, **≥86% Yes**), alongside the latest completed reset and next expected time. The heading switches to an upcoming-reset question when a live schedule is available.
-- Schedule confidence comes directly from the public API; it is rounded to a percent as on the source page, with no plugin-defined 80% threshold. A live schedule displays probability + Yes even when its local date is tomorrow. A completion reported today takes priority. Scheduled events remain schedule records and do not replace the latest completed reset. The day check uses the browser's local calendar day; completion times prefer `completedAt`, then `effectiveAt`, then `announcedAt`.
+- Schedule confidence comes directly from the public API and is rounded to a percent as on the source page. In the popover, a live schedule displays probability + Yes even below 80% or when its local date is tomorrow. A completion reported today takes priority. Scheduled events remain schedule records and do not replace the latest completed reset. The day check uses the browser's local calendar day; completion times prefer `completedAt`, then `effectiveAt`, then `announcedAt`.
 - The popover includes the Tibo Sottiaux source post. It shows the Simplified Chinese translation and the English source when both differ.
-- New schedule announcements and completed reset events show an unread marker. The marker clears when the popover is open in a visible tab.
+- The dock entry follows the popover's schedule rules. When no completion has been reported today and a live pending schedule has a rounded probability of at least 80%, its label becomes `Codex Reset ≥86%` (`Codex Reset 100%` at 100%); otherwise it stays `Codex Reset Tracker`. Only the percentage is violet; the name keeps its normal color. The percentage shares the name's font weight and keeps its violet color on hover and when expanded. Normal refreshes keep the last successful, still-valid forecast visible. A failed request restores the default label until a later successful response confirms a valid forecast. Unread markers and unread storage are removed. The entry reserves the widest label in the active language so neighbouring controls stay in place, while the hover background and clickable area fit the visible content.
 - The client requests `/status` on mount and refreshes every 10 minutes. Opening the popover, returning to the foreground, or reconnecting checks for updates when the snapshot is at least 60 seconds old. Requests time out after 20 seconds and respect rate-limit cooldowns. The popover displays the local time zone and fetch time; fetch time is not the upstream monitor time. The agent tool can query status or paginated records.
+- When today's reset answer turns from no to yes, the client raises one system notification saying `Codex has reset` (`Codex 已经重置` in Chinese). Notifications need browser permission: the popover footer offers Enable notifications, and only that click asks for it; a denial or an unsupported browser simply sends nothing. Recent completion IDs are deduplicated across status slots and kept in local storage so a reload stays quiet; browsers supporting Web Locks also coordinate concurrent pages. Without that coordination, cross-page deduplication is best effort. A blocked storage API deduplicates only within the current page, and the first load only records a baseline instead of replaying history. Detection rides the polling above, so it can lag by up to one refresh interval.
 
 ## Install from source
 
@@ -45,7 +46,7 @@ dsh plugin --profile <profile> remove dsh-codex-reset
 dsh plugin --profile <profile> add https://github.com/loshanvren/dsh-codex-reset-tracker/releases/latest/download/dsh-codex-reset-tracker.tgz
 ```
 
-Restart DSH after replacing the package. If you applied the patch manually, change its package `name` to `dsh-codex-reset-tracker`, preserve the `codex-reset` row ID and your `config`, and do not keep a second old row. The unread storage key stays compatible.
+Restart DSH after replacing the package. If you applied the patch manually, change its package `name` to `dsh-codex-reset-tracker`, preserve the `codex-reset` row ID and your `config`, and do not keep a second old row.
 
 ### Prebuilt install
 

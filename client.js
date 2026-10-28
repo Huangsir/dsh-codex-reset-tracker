@@ -14,9 +14,12 @@ window.__ModuleLoader__.load({
     const AUTO_REFRESH_MS = 10 * 60 * 1000;
     const INTERACTIVE_REFRESH_MS = 60 * 1000;
     const REQUEST_TIMEOUT_MS = 20 * 1000;
+    const RESET_NOTICE_STORAGE_KEY = 'dsh-codex-reset-tracker.reset-notice.v1';
+    const MAX_RESET_NOTICE_KEYS = 128;
     const zh = {
       'title': 'Codex 重置追踪',
       'chipName': 'Codex 重置追踪',
+      'chipReset': 'Codex 重置',
       'refresh': '刷新 Codex 重置状态',
       'close': '关闭',
       'statusOf': 'Codex 重置追踪状态',
@@ -50,16 +53,22 @@ window.__ModuleLoader__.load({
       'todayUnknown': '无法确认',
       'completionAnnouncementTime': '按完成公告时间：{time}',
       'nextScheduleLabel': '预计下次重置',
+      'scheduleToday': '（今天）',
+      'scheduleTomorrow': '（明天）',
       'viewOriginal': '查看原帖',
       'dataSource': '数据来源',
       'refreshFetched': '刷新；上次获取于 {time}',
       'openTiboPost': '打开 Tibo 原帖',
-      'newResetSignal': '有新的重置信号',
+      'notifyReset': 'Codex 已经重置',
+      'notifyAsk': '开启系统通知',
+      'notifyOn': '系统通知已开启',
+      'notifyBlocked': '系统通知已被阻止',
     };
 
     const en = {
       'title': 'Codex Reset Tracker',
       'chipName': 'Codex Reset Tracker',
+      'chipReset': 'Codex Reset',
       'refresh': 'Refresh Codex reset status',
       'close': 'Close',
       'statusOf': 'Codex reset status',
@@ -93,11 +102,16 @@ window.__ModuleLoader__.load({
       'todayUnknown': 'Unable to confirm',
       'completionAnnouncementTime': 'Using completion announcement time: {time}',
       'nextScheduleLabel': 'Next expected reset',
+      'scheduleToday': '(Today)',
+      'scheduleTomorrow': '(Tomorrow)',
       'viewOriginal': 'View original post',
       'dataSource': 'Source',
       'refreshFetched': 'Refresh; last fetched {time}',
       'openTiboPost': 'Open Tibo post',
-      'newResetSignal': 'New reset signal',
+      'notifyReset': 'Codex has reset',
+      'notifyAsk': 'Enable notifications',
+      'notifyOn': 'Notifications on',
+      'notifyBlocked': 'Notifications blocked',
     };
 
     function makeT(raw) {
@@ -419,144 +433,143 @@ window.__ModuleLoader__.load({
 
     /** The module-level snapshot survives client remounts. */
     const statusStore = createStore({ phase: 'loading', entry: null, error: null, lang: null, retryAt: 0 });
-    const UNREAD_STORAGE_KEY = 'dsh-codex-reset.unread.v1';
-    const MAX_TRACKED_EVENTS = 64;
-
-    function normalizeEventKeys(values) {
-      if (!Array.isArray(values)) return [];
-      return Array.from(new Set(values.filter((value) =>
-        typeof value === 'string' && value.length > 0 && value.length <= 1024,
-      ))).slice(-MAX_TRACKED_EVENTS);
-    }
-
-    function normalizeUnreadState(value) {
-      if (!value || typeof value !== 'object') {
-        return { baseline: false, observedKeys: [], pendingKeys: [] };
-      }
-      const baseline = value.baseline === true;
-      const observedKeys = normalizeEventKeys(value.observedKeys);
-      const observed = new Set(observedKeys);
-      const pendingKeys = baseline
-        ? normalizeEventKeys(value.pendingKeys).filter((key) => observed.has(key))
-        : [];
-      return { baseline, observedKeys, pendingKeys };
-    }
-
-    function readUnreadState() {
-      try {
-        const storage = window.localStorage;
-        const raw = storage && storage.getItem(UNREAD_STORAGE_KEY);
-        return raw ? normalizeUnreadState(JSON.parse(raw)) : normalizeUnreadState(null);
-      } catch {
-        return normalizeUnreadState(null);
-      }
-    }
-
-    let unreadMemoryState = readUnreadState();
-    const unreadStore = createStore(unreadMemoryState);
-    const popoverViewStore = createStore({ active: false });
-
-    function persistUnreadState(value) {
-      unreadMemoryState = normalizeUnreadState(value);
-      try {
-        const storage = window.localStorage;
-        if (storage) storage.setItem(UNREAD_STORAGE_KEY, JSON.stringify(unreadMemoryState));
-      } catch {
-        /* Keep the module-level state when browser storage is unavailable. */
-      }
-      unreadStore.set(unreadMemoryState);
-    }
-
-    function clearUnread() {
-      const current = unreadStore.getSnapshot();
-      if (current.pendingKeys.length) {
-        persistUnreadState({ ...current, pendingKeys: [] });
-      }
-    }
-
-    function isPopoverViewing(open, visibilityState) {
-      return open === true && visibilityState === 'visible';
-    }
-
-    function setPopoverViewing(active) {
-      if (popoverViewStore.getSnapshot().active !== active) {
-        popoverViewStore.set({ active });
-      }
-      if (active) clearUnread();
-    }
-
-    function eventTimestamp(record, stage) {
-      const source = record && record.source;
-      const raw = stage === 'announcement'
-        ? record.announcedAt || record.publishedAt || record.createdAt ||
-          (source && source.publishedAt) || record.effectiveAt || record.scheduledAt
-        : record.completedAt || record.effectiveAt || record.announcedAt || record.createdAt;
-      if (raw === undefined || raw === null || raw === '') return '';
-      const parsed = Date.parse(String(raw));
-      return Number.isFinite(parsed) ? new Date(parsed).toISOString() : String(raw).trim();
-    }
-
-    function canonicalEventUrl(value) {
-      if (typeof value !== 'string' || !value.trim()) return '';
-      try {
-        const url = new URL(value);
-        url.search = '';
-        url.hash = '';
-        return url.origin.toLowerCase() + url.pathname.replace(/\/+$/, '');
-      } catch {
-        return value.trim().slice(0, 512);
-      }
-    }
-
-    function resetEventKey(record, stage) {
-      if (!record || typeof record !== 'object') return null;
-      const source = record.source;
-      const rawId = record.id || record.recordId || record.sourceId;
-      const identity = rawId !== undefined && rawId !== null && String(rawId).trim()
-        ? 'id:' + String(rawId).trim().slice(0, 256)
-        : 'url:' + canonicalEventUrl(
-            (source && source.url) || record.url || record.detailUrl,
-          );
-      const time = eventTimestamp(record, stage);
-      if (identity === 'url:' && !time) return null;
-      return JSON.stringify([stage, identity, time]).slice(0, 1024);
-    }
-
-    function observeStatusEvents(data) {
-      const keys = [
-        resetEventKey(data && data.nextScheduled, 'announcement'),
-        resetEventKey(data && data.latestGlobal, 'completion'),
-        resetEventKey(data && data.latestBanked, 'completion'),
-      ].filter(Boolean);
-      const current = unreadStore.getSnapshot();
-      const observed = new Set(current.observedKeys);
-      const fresh = current.baseline ? keys.filter((key) => !observed.has(key)) : [];
-      const observedKeys = normalizeEventKeys([...current.observedKeys, ...keys]);
-      const pendingKeys = current.baseline && !popoverViewStore.getSnapshot().active
-        ? normalizeEventKeys([...current.pendingKeys, ...fresh])
-        : current.pendingKeys;
-      const next = {
-        baseline: true,
-        observedKeys,
-        pendingKeys,
-      };
-      if (
-        !current.baseline ||
-        observedKeys.length !== current.observedKeys.length ||
-        pendingKeys.length !== current.pendingKeys.length ||
-        observedKeys.some((key, index) => key !== current.observedKeys[index]) ||
-        pendingKeys.some((key, index) => key !== current.pendingKeys[index])
-      ) {
-        persistUnreadState(next);
-      }
-    }
-
     const statusInflight = new Map();
     let statusPollUsers = 0;
     let statusPollLang = null;
     let statusPollTimer = null;
     let requestedLang = null;
     let retryAt = 0;
+    /** Recent completion identities observed by this page and shared storage. */
+    let resetNoticeKeys = [];
+    let resetNoticeReady = false;
+
+    /** Unique event identities, independent of which status slot contains them. */
+    function todayCompletionKeys(data, now) {
+      if (resetHappenedToday(data, now) !== true) return [];
+      const timeZone = resolveSummaryTimeZone(data.timeZone);
+      const currentAt = Number.isFinite(now) ? now : Date.parse(data.currentTime || '');
+      const today = dateKeyAt(currentAt, timeZone);
+      return Array.from(new Set([data.latestGlobal, data.latestBanked]
+        .filter((record) => record && (!record.kind || record.kind === 'reset_completed'))
+        .map((record) => {
+          const time = resetCompletionTime(record);
+          const at = time && Date.parse(time.value);
+          if (!Number.isFinite(at) || at > currentAt || dateKeyAt(at, timeZone) !== today) return null;
+          return record.id ? 'id:' + record.id : 'time:' + record.resetType + ':' + time.value;
+        })
+        .filter(Boolean)));
+    }
+
+    function normalizeResetNoticeKeys(keys) {
+      return Array.from(new Set(keys.filter((key) =>
+        typeof key === 'string' && key.length > 0 && key.length <= 1024,
+      ))).slice(-MAX_RESET_NOTICE_KEYS);
+    }
+
+    /** undefined means this browser has not recorded its first baseline. */
+    function readStoredResetNotices() {
+      try {
+        const parsed = JSON.parse(window.localStorage.getItem(RESET_NOTICE_STORAGE_KEY));
+        return parsed && Array.isArray(parsed.keys) ? normalizeResetNoticeKeys(parsed.keys) : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+
+    function writeStoredResetNotices(keys) {
+      try {
+        window.localStorage.setItem(RESET_NOTICE_STORAGE_KEY, JSON.stringify({ keys }));
+      } catch {
+        // Blocked storage still dedupes within this page through in-memory keys.
+      }
+    }
+
+    function notificationPermission() {
+      if (typeof Notification !== 'function') return 'unsupported';
+      return Notification.permission || 'default';
+    }
+
+    function resetNoticeText() {
+      return isZh(requestedLang) ? zh['notifyReset'] : en['notifyReset'];
+    }
+
+    function showSystemResetNotice() {
+      if (notificationPermission() !== 'granted') return;
+      try {
+        const notice = new Notification(resetNoticeText(), { tag: 'codex-reset-completed' });
+        notice.onclick = () => {
+          try {
+            window.focus();
+          } catch {
+            // A background tab cannot always raise itself.
+          }
+          try {
+            notice.close();
+          } catch {
+            // The browser already dismissed it.
+          }
+        };
+      } catch {
+        // Some browsers expose the API but refuse to construct a notification.
+      }
+    }
+
+    /** Refresh shared seen IDs for every decision; serialize concurrent pages when supported. */
+    async function observeResetCompletion(data) {
+      const current = todayCompletionKeys(data, Date.now());
+      const update = () => {
+        const stored = readStoredResetNotices();
+        const seen = new Set([...resetNoticeKeys, ...(stored || [])]);
+        const baseline = !resetNoticeReady && stored === undefined;
+        const fresh = current.some((key) => !seen.has(key));
+        resetNoticeReady = true;
+        resetNoticeKeys = normalizeResetNoticeKeys([...seen, ...current]);
+        writeStoredResetNotices(resetNoticeKeys);
+        if (!baseline && fresh) showSystemResetNotice();
+      };
+      const locks = typeof navigator !== 'undefined' && navigator.locks;
+      if (locks && typeof locks.request === 'function') {
+        try {
+          await locks.request(RESET_NOTICE_STORAGE_KEY, update);
+          return;
+        } catch {
+          // Fall back to shared-storage checks if browser coordination is unavailable.
+        }
+      }
+      update();
+    }
+
+    function requestNotificationPermission(onPermission) {
+      if (typeof Notification !== 'function' || typeof Notification.requestPermission !== 'function') return;
+      let pending;
+      try {
+        pending = Notification.requestPermission();
+      } catch {
+        return;
+      }
+      Promise.resolve(pending).then((value) => onPermission(String(value || 'default')), () => {});
+    }
+
+    /**
+     * Footer control for the browser's notification permission. Asking needs a
+     * click, so the request cannot run unattended when the page loads.
+     */
+    function NoticePermissionControl(props) {
+      const permission = props.permission === undefined ? notificationPermission() : props.permission;
+      if (permission === 'unsupported') return null;
+      const label = permission === 'granted' ? props.t('notifyOn')
+        : permission === 'denied' ? props.t('notifyBlocked') : props.t('notifyAsk');
+      const settled = permission === 'granted' || permission === 'denied';
+      return h('button', {
+        type: 'button',
+        className: 'dcr-notify-toggle',
+        onClick: settled ? undefined : () => requestNotificationPermission(props.onPermission || (() => {})),
+        disabled: settled,
+        title: label,
+        'aria-label': label,
+      }, label);
+    }
+
     function ensureStatus(lang, force) {
       const snapshot = statusStore.getSnapshot();
       const entry = snapshot.entry;
@@ -580,7 +593,8 @@ window.__ModuleLoader__.load({
       statusStore.set({
         phase: old.entry ? 'refreshing' : 'loading',
         entry: old.entry,
-        error: null,
+        // A retry is not a successful response; clear the error only on success.
+        error: old.error,
         lang,
         retryAt,
       });
@@ -595,8 +609,8 @@ window.__ModuleLoader__.load({
           const fresh = await fetchStatus(lang, controller.signal);
           if (requestedLang === lang) {
             retryAt = 0;
-            observeStatusEvents(fresh.data);
             statusStore.set({ phase: 'ready', entry: { ...fresh, lang }, error: null, lang, retryAt: 0 });
+            await observeResetCompletion(fresh.data);
           }
         } catch (err) {
           if (err && err.name === 'AbortError' && !timedOut) return;
@@ -716,14 +730,19 @@ window.__ModuleLoader__.load({
     }
 
     const CSS = `
-.dcr-dock{position:relative;display:inline-flex;flex:0 0 auto;align-items:center;min-width:0;color:var(--dsw-alias-label-primary);font:inherit}
-.dcr-dock-button{position:relative;display:inline-flex;flex:0 0 auto;align-items:center;gap:6px;min-height:28px;padding:3px 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;font-weight:550;white-space:nowrap;cursor:pointer;transition:background .14s ease,color .14s ease}
-.dcr-dock-button>span:not(.dcr-dock-glyph):not(.dcr-unread-dot){white-space:nowrap}
-.dcr-dock-button:hover,.dcr-dock-button[aria-expanded=true]{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.dcr-dock{position:relative;display:inline-grid;flex:0 0 auto;align-items:center;min-width:0;color:var(--dsw-alias-label-primary);font:inherit}
+.dcr-dock-button,.dcr-dock-sizer{grid-area:1/1;position:relative;display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:3px 8px;border:0;box-sizing:border-box;font:inherit;font-size:12px;font-weight:550;white-space:nowrap}
+.dcr-dock-button{justify-self:start;width:max-content;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;transition:background .14s ease}
+.dcr-dock-sizer{visibility:hidden;pointer-events:none;font-weight:650}
+.dcr-dock-label-sizer{display:inline-grid}
+.dcr-dock-label-sizer>span{grid-area:1/1}
+.dcr-chip-probability,.dcr-dock-label-sizer{font-variant-numeric:tabular-nums}
+.dcr-chip-probability{color:#6d28d9}
+body[data-ds-dark-theme] .dcr-chip-probability{color:#a78bfa}
+.dcr-dock-button:hover,.dcr-dock-button[aria-expanded=true]{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-weight:650}
 .dcr-dock-button:focus-visible,.dcr-panel-icon-button:focus-visible,.dcr-refresh-action:focus-visible,.dcr-btn:focus-visible,.dcr-external-link:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}
 .dcr-external-link:focus-visible{text-decoration:underline}
 .dcr-dock-glyph{display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--dsw-alias-state-business-primary)}
-.dcr-unread-dot{position:absolute;top:2px;right:3px;width:7px;height:7px;box-sizing:content-box;border:2px solid var(--dsw-alias-bg-layer-1);border-radius:50%;background:var(--dsw-alias-state-business-primary);pointer-events:none}
 .dcr-card{position:fixed;z-index:2147483000;box-sizing:border-box;display:flex;flex-direction:column;gap:0;width:min(380px,calc(100vw - 24px));max-height:min(540px,calc(100dvh - 16px));overflow:auto;overscroll-behavior:contain;padding:16px;border:1px solid var(--dsw-alias-border-l1);border-radius:20px;background:var(--dsw-alias-bg-base,var(--dsw-alias-bg-layer-1));color:var(--dsw-alias-label-primary);--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);box-shadow:var(--dsw-elevation-prominent,0 8px 28px rgba(9,12,24,.18));font:inherit;animation:dcr-in .16s cubic-bezier(.23,1,.32,1) both}
 @keyframes dcr-in{from{opacity:0;transform:translateY(4px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
 .dcr-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
@@ -742,6 +761,9 @@ window.__ModuleLoader__.load({
 .dcr-refresh-action{position:relative;display:inline-flex;flex:none;align-items:center;justify-content:center;box-sizing:border-box;width:32px;height:32px;min-width:32px;min-height:32px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer}
 .dcr-refresh-action:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .dcr-refresh-action:disabled{opacity:.58;cursor:default}
+.dcr-notify-toggle{display:inline-flex;flex:none;align-items:center;min-width:0;max-width:11em;margin-right:4px;padding:0 8px;min-height:32px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dcr-notify-toggle:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.dcr-notify-toggle:disabled{opacity:.58;cursor:default}
 .dcr-spin{animation:dcr-rot .8s linear infinite}
 @keyframes dcr-rot{to{transform:rotate(360deg)}}
 .dcr-status-line{box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);align-items:stretch;gap:16px;width:100%;min-width:0;margin-top:12px;padding:16px;border-radius:12px;background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 6%,var(--dsw-alias-bg-base));color:var(--dsw-alias-label-primary);line-height:1.4;text-align:left}
@@ -753,8 +775,12 @@ window.__ModuleLoader__.load({
 .dcr-summary-details{display:flex;flex-direction:column;justify-content:center;gap:10px;min-width:0;padding-left:16px;border-left:1px solid var(--dsw-alias-border-l1)}
 .dcr-summary-item{display:flex;flex-direction:column;gap:4px;min-width:0}
 .dcr-summary-label{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:500;line-height:1.35}
+.dcr-summary-next-label{font-weight:700}
 .dcr-summary-value{color:var(--dsw-alias-label-primary);font-size:15px;font-weight:600;line-height:1.35;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .dcr-summary-subvalue{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:400;line-height:1.35;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.dcr-summary-latest .dcr-summary-label{font-size:11px}
+.dcr-summary-latest .dcr-summary-value{font-size:14px;font-weight:400}
+.dcr-summary-latest .dcr-summary-subvalue{font-size:11px}
 .dcr-freshness{margin:10px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .dcr-summary-meta{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:400;line-height:1.35}
 .dcr-tibo-post{box-sizing:border-box;width:100%;min-width:0;margin-top:16px}
@@ -790,7 +816,7 @@ window.__ModuleLoader__.load({
   .dcr-summary-answer.is-unknown{font-size:18px}
 }
 @media(pointer:coarse){
-  .dcr-dock-button,.dcr-panel-icon-button{min-width:44px;min-height:44px}
+  .dcr-dock-button,.dcr-dock-sizer,.dcr-panel-icon-button{min-width:44px;min-height:44px}
   .dcr-panel-icon-button{width:44px;height:44px}
   .dcr-source-link,.dcr-source-action,.dcr-refresh-action{min-height:44px}
   .dcr-refresh-action{width:44px;height:44px;min-width:44px;min-height:44px;padding:0 8px}
@@ -828,6 +854,17 @@ window.__ModuleLoader__.load({
       }
     }
 
+    function scheduleDaySuffix(iso, now, t) {
+      const target = new Date(iso);
+      const current = new Date(now);
+      const sameDay = (a, b) => a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+      if (sameDay(target, current)) return t('scheduleToday');
+      const tomorrow = new Date(current);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return sameDay(target, tomorrow) ? t('scheduleTomorrow') : '';
+    }
+
     function ResetSummary({ data, t, localeId, now }) {
       const latest = latestResetRecord(data);
       const latestTime = resetCompletionTime(latest);
@@ -855,7 +892,7 @@ window.__ModuleLoader__.load({
           : fmtAbsExact(latestAt, localeId)
         : undefined;
       const nextDisplay = nextAt
-        ? fmtScheduleAbs(nextAt, localeId, next.schedulePrecision)
+        ? [fmtScheduleAbs(nextAt, localeId, next.schedulePrecision), scheduleDaySuffix(nextAt, now, t)].filter(Boolean).join(' ')
         : next
           ? t('scheduleUnknown')
           : t('noSchedule');
@@ -870,7 +907,7 @@ window.__ModuleLoader__.load({
         'section',
         {
           className: 'dcr-status-line',
-          'aria-label': [question, todayAnswer, t('latestReset'), latestDisplay, t('nextScheduleLabel'), nextDisplay].join(' · '),
+          'aria-label': [question, todayAnswer, t('nextScheduleLabel'), nextDisplay, t('latestReset'), latestDisplay].join(' · '),
         },
         h('div', { className: 'dcr-summary-today' },
           h('span', { className: 'dcr-summary-question' }, question),
@@ -879,6 +916,12 @@ window.__ModuleLoader__.load({
         ),
         h('div', { className: 'dcr-summary-details' },
           h('div', { className: 'dcr-summary-item' },
+            h('strong', { className: 'dcr-summary-label dcr-summary-next-label' }, t('nextScheduleLabel')),
+            nextAt
+              ? h('time', { className: 'dcr-summary-value', dateTime: nextAt, title: nextTimeTitle }, nextDisplay)
+              : h('span', { className: 'dcr-summary-meta' }, nextDisplay),
+          ),
+          h('div', { className: 'dcr-summary-item dcr-summary-latest' },
             h('span', { className: 'dcr-summary-label' }, t('latestReset')),
             latestAt
               ? h('time', { className: 'dcr-summary-value', dateTime: latestAt, title: latestTimeTitle }, latestDisplay)
@@ -888,12 +931,6 @@ window.__ModuleLoader__.load({
               : latest
                 ? h('span', { className: 'dcr-summary-subvalue' }, resetScopeLabel(latest, t))
                 : null,
-          ),
-          h('div', { className: 'dcr-summary-item' },
-            h('span', { className: 'dcr-summary-label' }, t('nextScheduleLabel')),
-            nextAt
-              ? h('time', { className: 'dcr-summary-value', dateTime: nextAt, title: nextTimeTitle }, nextDisplay)
-              : h('span', { className: 'dcr-summary-meta' }, nextDisplay),
           ),
         ),
       );
@@ -1103,23 +1140,26 @@ window.__ModuleLoader__.load({
 
       const localeId = localeIdOf(locale);
       const lang = siteLangOf(localeId);
-      const unread = useSyncExternalStore(unreadStore.subscribe, unreadStore.getSnapshot);
       const status = useSyncExternalStore(statusStore.subscribe, statusStore.getSnapshot);
       const [open, setOpen] = useState(false);
-      const [isVisible, setIsVisible] = useState(() => document.visibilityState === 'visible');
       const [now, setNow] = useState(() => Date.now());
       const [position, setPosition] = useState(null);
+      const [noticePermission, setNoticePermission] = useState(notificationPermission);
       const triggerRef = useRef(null);
       const panelRef = useRef(null);
       const panelId = useRef('dcr-popover-' + Math.random().toString(36).slice(2));
-      const hasUnread = unread.pendingKeys.length > 0;
       const busy = status.phase === 'loading' || status.phase === 'refreshing';
       const data = status.entry ? status.entry.data : null;
       const fetchedAt = status.entry ? status.entry.at : null;
       const summaryTimeIso = resetSummaryTimestamp(data);
-      const dockAccessibleLabel = hasUnread
-        ? t('statusOf') + ' · ' + t('newResetSignal')
-        : t('statusOf');
+      const dockAccessibleLabel = t('statusOf');
+      // Closed docks do not run the popover's one-second clock. Use the current
+      // render time so each poll also reevaluates expiry and local-day priority.
+      const verdict = reportedVerdict(data, open ? now : Date.now());
+      const chipPercent = status.phase !== 'error' && !status.error && verdict.percent !== null && verdict.percent >= 80
+        ? verdict.percent : null;
+      const chipProbability = chipPercent === null ? ''
+        : (chipPercent === 100 ? '' : '≥') + chipPercent + '%';
       const refreshTitle = fetchedAt
         ? t('refreshFetched', { time: fmtAbs(new Date(fetchedAt).toISOString(), localeId) })
         : t('refresh');
@@ -1129,22 +1169,6 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         if (open) ensureStatus(lang, false);
       }, [open, lang]);
-
-      useEffect(() => {
-        const syncVisibility = () => {
-          const visible = document.visibilityState === 'visible';
-          setIsVisible(visible);
-          setPopoverViewing(isPopoverViewing(open, visible ? 'visible' : 'hidden'));
-        };
-        document.addEventListener('visibilitychange', syncVisibility);
-        syncVisibility();
-        return () => document.removeEventListener('visibilitychange', syncVisibility);
-      }, [open]);
-
-      useLayoutEffect(() => {
-        setPopoverViewing(isPopoverViewing(open, isVisible ? 'visible' : 'hidden'));
-        return () => setPopoverViewing(false);
-      }, [open, isVisible]);
 
       useEffect(() => {
         if (!open) return undefined;
@@ -1159,14 +1183,12 @@ window.__ModuleLoader__.load({
           const target = event.target;
           if (panelRef.current && panelRef.current.contains(target)) return;
           if (triggerRef.current && triggerRef.current.contains(target)) return;
-          setPopoverViewing(false);
           setOpen(false);
         };
         const onKeyDown = (event) => {
           if (event.key !== 'Escape') return;
           event.preventDefault();
           event.stopPropagation();
-          setPopoverViewing(false);
           setOpen(false);
           if (triggerRef.current) triggerRef.current.focus({ preventScroll: true });
         };
@@ -1241,7 +1263,6 @@ window.__ModuleLoader__.load({
       }, [open, position && position.width, position && position.maxHeight, status.entry, status.phase]);
 
       const closeToTrigger = () => {
-        setPopoverViewing(false);
         setOpen(false);
         if (triggerRef.current) triggerRef.current.focus({ preventScroll: true });
       };
@@ -1256,6 +1277,16 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'dcr-dock' },
+          // Reserve the current language's widest label outside the button so
+          // neighbours stay put while the hover and hit area fit visible text.
+          h('span', { className: 'dcr-dock-sizer', 'aria-hidden': true },
+            h('span', { style: { width: 16, flex: 'none' } }),
+            h('span', { className: 'dcr-dock-label-sizer' },
+              h('span', null, t('chipName')),
+              h('span', null, t('chipReset') + ' ≥88%'),
+              h('span', null, t('chipReset') + ' 100%'),
+            ),
+          ),
           h(
             'button',
             {
@@ -1266,15 +1297,14 @@ window.__ModuleLoader__.load({
               title: dockAccessibleLabel,
               'aria-expanded': open,
               'aria-controls': panelId.current,
-              onClick: () => {
-                const next = !open;
-                setPopoverViewing(isPopoverViewing(next, document.visibilityState));
-                setOpen(next);
-              },
+              onClick: () => setOpen(!open),
             },
             h('span', { className: 'dcr-dock-glyph', 'aria-hidden': true }, h(ResetGlyph, { size: 16 })),
-            h('span', null, t('chipName')),
-            hasUnread ? h('span', { className: 'dcr-unread-dot', title: t('newResetSignal'), 'aria-label': t('newResetSignal') }) : null,
+            h('span', { className: 'dcr-dock-label' },
+              chipProbability
+                ? [t('chipReset') + ' ', h('span', { className: 'dcr-chip-probability', key: 'probability' }, chipProbability)]
+                : t('chipName'),
+            ),
           ),
           open
             ? h(
@@ -1339,6 +1369,11 @@ window.__ModuleLoader__.load({
                     h(IconLink, { size: 12 }),
                   ),
                   h('div', { className: 'dcr-foot-tools' },
+                    h(NoticePermissionControl, {
+                      t,
+                      permission: noticePermission,
+                      onPermission: setNoticePermission,
+                    }),
                     h(
                       'button',
                       {
