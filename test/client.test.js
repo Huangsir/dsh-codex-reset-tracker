@@ -122,20 +122,30 @@ test('installation identity includes tracker in manifest, lockfile, loader and p
   assert.match(readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8'), /name: 'dsh-codex-reset-tracker'/);
 });
 
-test('the entry registers in the composer status strip, not the row below it', () => {
+test('the entry registers immediately before auto-compact in the right status group', () => {
   const { api } = client();
   const registered = [];
+  const injected = [];
   const ctx = {
     effect(fn) { fn(); },
     locale: { register: () => () => {}, bind: () => (key) => key },
     slots: {
-      inject(_name, setup) { setup(); },
+      inject(name, setup) { injected.push(name); setup(); },
       register(options) { registered.push(options); return () => {}; },
     },
   };
   api.apply(ctx);
+  assert.deepEqual(injected, ['conversation.input.right']);
   assert.deepEqual(registered.map((entry) => [entry.name, entry.id]), [
-    ['conversation.input.left', 'codex-reset-status'],
+    ['conversation.input.right', 'codex-reset-status'],
+  ]);
+  // auto-compact registers its ring in this slot with order 10.
+  const entries = [
+    { id: 'dsh-auto-compact-ring', order: 10 },
+    ...registered,
+  ].sort((left, right) => left.order - right.order);
+  assert.deepEqual(entries.map((entry) => entry.id), [
+    'codex-reset-status', 'dsh-auto-compact-ring',
   ]);
 });
 
