@@ -122,6 +122,23 @@ test('installation identity includes tracker in manifest, lockfile, loader and p
   assert.match(readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8'), /name: 'dsh-codex-reset-tracker'/);
 });
 
+test('the entry registers in the composer status strip, not the row below it', () => {
+  const { api } = client();
+  const registered = [];
+  const ctx = {
+    effect(fn) { fn(); },
+    locale: { register: () => () => {}, bind: () => (key) => key },
+    slots: {
+      inject(_name, setup) { setup(); },
+      register(options) { registered.push(options); return () => {}; },
+    },
+  };
+  api.apply(ctx);
+  assert.deepEqual(registered.map((entry) => [entry.name, entry.id]), [
+    ['conversation.input.left', 'codex-reset-status'],
+  ]);
+});
+
 test('dock displays high-confidence forecasts in either language without adding Yes', async () => {
   const c = client();
   await c.api.ensureStatus('zh-CN', false);

@@ -1403,10 +1403,13 @@ body[data-ds-dark-theme] .dcr-chip-probability{color:#a78bfa}
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'codex-reset: dictionaries');
       const t = ctx.locale.bind(NS);
 
-      ctx.slots.inject('conversation.composer.dock', () =>
+      // The composer's status strip (leading group: permission, plan, then this
+      // list) keeps the entry on the row above the dock, like the source page's
+      // status chips. The dock list sits on its own centred row below.
+      ctx.slots.inject('conversation.input.left', () =>
         ctx.slots.register(
           {
-            name: 'conversation.composer.dock',
+            name: 'conversation.input.left',
             id: 'codex-reset-status',
             order: -100,
             label: () => t('statusOf'),
