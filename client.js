@@ -727,9 +727,10 @@ window.__ModuleLoader__.load({
 
     const CSS = `
 .dcr-dock{position:relative;display:inline-flex;flex:0 0 auto;align-items:center;min-width:0;color:var(--dsw-alias-label-primary);font:inherit}
-.dcr-dock-button{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:28px;padding:3px 8px;border:0;box-sizing:border-box;font:inherit;font-size:12px;font-weight:550;white-space:nowrap;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;transition:background .14s ease}
-.dcr-chip-probability{font-variant-numeric:tabular-nums;color:#6d28d9}
-body[data-ds-dark-theme] .dcr-chip-probability{color:#a78bfa}
+.dcr-dock-button{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:0;min-height:28px;padding:0 6px;border:0;box-sizing:border-box;font:inherit;font-size:12px;font-weight:550;white-space:nowrap;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;transition:background .14s ease}
+.dcr-chip-probability{font-variant-numeric:tabular-nums;white-space:pre}
+.dcr-chip-probability,.dcr-summary-answer.has-probability{color:#6d28d9}
+body[data-ds-dark-theme] .dcr-chip-probability,body[data-ds-dark-theme] .dcr-summary-answer.has-probability{color:#a78bfa}
 .dcr-dock-button:hover,.dcr-dock-button[aria-expanded=true]{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-weight:650}
 .dcr-dock-button:focus-visible,.dcr-panel-icon-button:focus-visible,.dcr-refresh-action:focus-visible,.dcr-btn:focus-visible,.dcr-external-link:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}
 .dcr-external-link:focus-visible{text-decoration:underline}
@@ -1149,8 +1150,10 @@ body[data-ds-dark-theme] .dcr-chip-probability{color:#a78bfa}
       const verdict = reportedVerdict(data, open ? now : Date.now());
       const chipPercent = status.phase !== 'error' && !status.error && verdict.percent !== null && verdict.percent >= 80
         ? verdict.percent : null;
+      // One literal space separates the glyph from the number: it is part of
+      // the label (` ≥93%`), so the gap is a space wide, not a CSS gap.
       const chipProbability = chipPercent === null ? ''
-        : (chipPercent === 100 ? '' : '≥') + chipPercent + '%';
+        : ' ' + (chipPercent === 100 ? '' : '≥') + chipPercent + '%';
       const refreshTitle = fetchedAt
         ? t('refreshFetched', { time: fmtAbs(new Date(fetchedAt).toISOString(), localeId) })
         : t('refresh');

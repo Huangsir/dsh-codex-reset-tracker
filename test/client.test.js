@@ -159,10 +159,12 @@ test('dock shows only the forecast percentage, with no name and no reserved widt
   for (const localeId of ['zh-CN', 'en']) {
     const tree = c.renderDock(localeId);
     const button = dockButton(tree);
-    assert.equal(visibleText(button), '≥86%');
+    assert.equal(visibleText(button), ' ≥86%');
+    // One space plus the four label characters: the gap is part of the text.
+    assert.equal([...visibleText(button)].length, 5);
     // Hidden reservation text would make the entry wider than what it shows.
-    assert.equal(rawText(dockEntry(tree)), '≥86%');
-    assert.equal(visibleText(probabilityNode(button)), '≥86%');
+    assert.equal(rawText(dockEntry(tree)), ' ≥86%');
+    assert.equal(visibleText(probabilityNode(button)), ' ≥86%');
   }
   assert.equal(dockButton(c.renderDock('zh-CN')).props['aria-label'], 'Codex 重置追踪状态');
   assert.equal(dockButton(c.renderDock('en')).props['aria-label'], 'Codex reset status');
@@ -184,10 +186,10 @@ test('dock uses the displayed rounded probability for the inclusive 80% threshol
   for (const [confidence, expected] of [
     [0.79, ''],
     [0.794, ''],
-    [0.795, '≥80%'],
-    [0.8, '≥80%'],
-    [0.93, '≥93%'],
-    [1, '100%'],
+    [0.795, ' ≥80%'],
+    [0.8, ' ≥80%'],
+    [0.93, ' ≥93%'],
+    [1, ' 100%'],
   ]) {
     const value = structuredClone(fixture);
     value.data.nextScheduled.confidence = confidence;
@@ -236,12 +238,12 @@ test('background refresh keeps the probability until the updated snapshot arrive
   for (const poll of c.intervals.keys()) poll();
   const pending = c.api.ensureStatus('zh-CN', false);
   assert.equal(c.api.statusStore.getSnapshot().phase, 'refreshing');
-  assert.equal(visibleText(dockButton(c.renderDock())), '≥86%');
+  assert.equal(visibleText(dockButton(c.renderDock())), ' ≥86%');
   finish();
   await pending;
   unsubscribe();
   release();
-  assert.deepEqual(labels, ['≥86%', '≥93%']);
+  assert.deepEqual(labels, [' ≥86%', ' ≥93%']);
 });
 
 test('failed refresh hides the dock probability until retry succeeds with a valid forecast', async () => {
@@ -267,7 +269,7 @@ test('failed refresh hides the dock probability until retry succeeds with a vali
   await pending;
   unsubscribe();
   assert.deepEqual(labels, [
-    '≥93%', '', '', '≥99%',
+    ' ≥93%', '', '', ' ≥99%',
   ]);
 });
 
@@ -287,7 +289,7 @@ test('failed refresh uses the default label without a valid cached forecast', as
 test('closed dock rechecks expired schedules with the current render time', async () => {
   const c = client();
   await c.api.ensureStatus('zh-CN', true);
-  assert.equal(visibleText(dockButton(c.renderDock())), '≥86%');
+  assert.equal(visibleText(dockButton(c.renderDock())), ' ≥86%');
   c.advance(8 * 60 * 60 * 1000);
   assert.equal(visibleText(dockButton(c.renderDock())), '');
 });
